@@ -21,6 +21,9 @@ function ExpressOAuthServer(options) {
     throw new InvalidArgumentError('Missing parameter: `model`');
   }
 
+  this.useErrorHandler = options.useErrorHandler ? true : false;
+  delete options.useErrorHandler;
+
   this.server = new NodeOAuthServer(options);
 }
 
@@ -48,9 +51,8 @@ ExpressOAuthServer.prototype.authenticate = function(options) {
         next();
       })
       .catch(function(e) {
-        return handleError(e, req, res);
-      });
-      //.finally(next);
+        return handleError(e, req, res, null, next);
+    });
   };
 };
 
@@ -80,7 +82,7 @@ ExpressOAuthServer.prototype.authorize = function(options) {
         return handleResponse(req, res, response);
       })
       .catch(function(e) {
-        return handleError(e, req, res, response);
+        return handleError(e, req, res, response, next);
       })
       .finally(next);
   };
@@ -112,7 +114,7 @@ ExpressOAuthServer.prototype.token = function(options) {
         return handleResponse(req, res, response);
       })
       .catch(function(e) {
-        return handleError(e, req, res, response);
+        return handleError(e, req, res, response, next);
       })
       .finally(next);
   };
@@ -131,17 +133,21 @@ var handleResponse = function(req, res, response) {
  * Handle error.
  */
 
-var handleError = function(e, req, res, response) {
+var handleError = function(e, req, res, response, next) {
 
-  if (response) {
-    res.set(response.headers);
+  if (this.useErrorHandler === true) {
+    next(e);
+  } else {
+    if (response) {
+      res.set(response.headers);
+    }
+
+    if (e instanceof UnauthorizedRequestError) {
+      return res.status(e.code);
+    }
+
+    res.status(e.code).send({ error: e.name, error_description: e.message });
   }
-
-  if (e instanceof UnauthorizedRequestError) {
-    return res.status(e.code);
-  }
-
-  res.status(e.code).send({ error: e.name, error_description: e.message });
 };
 
 /**
