@@ -21,6 +21,9 @@ function ExpressOAuthServer(options) {
     throw new InvalidArgumentError('Missing parameter: `model`');
   }
 
+  this.useErrorHandler = options.useErrorHandler ? true : false;
+  delete options.useErrorHandler;
+
   this.server = new NodeOAuthServer(options);
 }
 
@@ -45,11 +48,11 @@ ExpressOAuthServer.prototype.authenticate = function(options) {
       })
       .tap(function(token) {
         res.locals.oauth = { token: token };
+        next();
       })
       .catch(function(e) {
-        return handleError(e, req, res);
-      })
-      .finally(next);
+        return handleError(e, req, res, null, next);
+    });
   };
 };
 
@@ -79,7 +82,7 @@ ExpressOAuthServer.prototype.authorize = function(options) {
         return handleResponse(req, res, response);
       })
       .catch(function(e) {
-        return handleError(e, req, res, response);
+        return handleError(e, req, res, response, next);
       })
       .finally(next);
   };
@@ -111,7 +114,7 @@ ExpressOAuthServer.prototype.token = function(options) {
         return handleResponse(req, res, response);
       })
       .catch(function(e) {
-        return handleError(e, req, res, response);
+        return handleError(e, req, res, response, next);
       })
       .finally(next);
   };
@@ -120,26 +123,39 @@ ExpressOAuthServer.prototype.token = function(options) {
 /**
  * Handle response.
  */
-
 var handleResponse = function(req, res, response) {
-  res.set(response.headers);
-  res.status(response.status).send(response.body);
+
+  if (response.status === 302) {
+    var location = response.headers.location;
+    delete response.headers.location;
+    res.set(response.headers);
+    res.redirect(location);
+  }
+  else {
+    res.set(response.headers);
+    res.status(response.status).send(response.body);
+  }
 };
 
 /**
  * Handle error.
  */
 
-var handleError = function(e, req, res, response) {
-  if (response) {
-    res.set(response.headers);
-  }
+var handleError = function(e, req, res, response, next) {
 
-  if (e instanceof UnauthorizedRequestError) {
-    return res.status(e.code);
-  }
+  if (this.useErrorHandler === true) {
+    next(e);
+  } else {
+    if (response) {
+      res.set(response.headers);
+    }
 
-  res.status(e.code).send({ error: e.name, error_description: e.message });
+    if (e instanceof UnauthorizedRequestError) {
+      return res.status(e.code);
+    }
+
+    res.status(e.code).send({ error: e.name, error_description: e.message });
+  }
 };
 
 /**
