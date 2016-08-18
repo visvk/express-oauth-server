@@ -283,4 +283,66 @@ describe('ExpressOAuthServer', function() {
         .end(done);
     });
   });
+
+  describe('revoke()', function() {
+    it('should return 200 OK on Invalid token error', function(done) {
+      var model = {
+        getClient: function() {
+          return { id: 'foo', grants: ['password'] };
+        },
+        getRefreshToken: function() {
+        },
+        getAccessToken: function() {
+        },
+        revokeToken: function() {
+        }
+      };
+      var oauth = new ExpressOAuthServer({ model: model });
+
+      app.use(oauth.revoke());
+
+      request(app.listen())
+        .post('/')
+        .send('client_id=foo&client_secret=bar&token=qux')
+        .expect(200)
+        .end(done);
+    });
+
+    it('should not return an error', function(done) {
+      var token = { accessToken: 'hash', client: { id: 'foo'}, user: {}, accessTokenExpiresAt: new Date(new Date() * 2) };
+      var model = {
+        getClient: function() {
+          return { id: 'foo', grants: ['password'] };
+        },
+        getRefreshToken: function() {
+        },
+        getAccessToken: function() {
+          return token;
+        },
+        revokeToken: function() {
+          return token;
+        }
+      };
+      var oauth = new ExpressOAuthServer({ model: model });
+
+      app.use(oauth.revoke());
+
+      request(app.listen())
+        .post('/')
+        .send('client_id=foo&client_secret=bar&token=qux')
+        .expect(200)
+        .end(done);
+    });
+
+    it('should return an error if `model` is empty', function(done) {
+      var oauth = new ExpressOAuthServer({ model: {} });
+
+      app.use(oauth.revoke());
+
+      request(app.listen())
+        .post('/')
+        .expect({ error: 'invalid_argument', error_description: 'Invalid argument: model does not implement `getClient()`' })
+        .end(done);
+    });
+  });
 });
