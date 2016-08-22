@@ -37,15 +37,13 @@ function ExpressOAuthServer(options) {
  */
 
 ExpressOAuthServer.prototype.authenticate = function(options) {
-  var server = this.server;
-
-  return function(req, res, next) {
+  return (function(req, res, next) {
     var request = new Request(req);
     var response = new Response(res);
 
     return Promise.bind(this)
       .then(function() {
-        return server.authenticate(request, response, options);
+        return this.server.authenticate(request, response, options);
       })
       .tap(function(token) {
         res.locals.oauth = { token: token };
@@ -54,7 +52,7 @@ ExpressOAuthServer.prototype.authenticate = function(options) {
       .catch(function(e) {
         return handleError(e, req, res, null, next);
     });
-  };
+  }).bind(this);
 };
 
 /**
@@ -66,15 +64,13 @@ ExpressOAuthServer.prototype.authenticate = function(options) {
  */
 
 ExpressOAuthServer.prototype.authorize = function(options) {
-  var server = this.server;
-
-  return function(req, res, next) {
+  return (function(req, res, next) {
     var request = new Request(req);
     var response = new Response(res);
 
     return Promise.bind(this)
       .then(function() {
-        return server.authorize(request, response, options);
+        return this.server.authorize(request, response, options);
       })
       .tap(function(code) {
         res.locals.oauth = { code: code };
@@ -83,10 +79,10 @@ ExpressOAuthServer.prototype.authorize = function(options) {
         return handleResponse(req, res, response);
       })
       .catch(function(e) {
-        return handleError(e, req, res, response, next);
+        return handleError.call(this, e, req, res, response, next);
       })
       .finally(next);
-  };
+  }).bind(this);
 };
 
 /**
@@ -98,15 +94,13 @@ ExpressOAuthServer.prototype.authorize = function(options) {
  */
 
 ExpressOAuthServer.prototype.token = function(options) {
-  var server = this.server;
-
-  return function(req, res, next) {
+  return (function(req, res, next) {
     var request = new Request(req);
     var response = new Response(res);
 
     return Promise.bind(this)
       .then(function() {
-        return server.token(request, response, options);
+        return this.server.token(request, response, options);
       })
       .tap(function(token) {
         res.locals.oauth = { token: token };
@@ -115,10 +109,10 @@ ExpressOAuthServer.prototype.token = function(options) {
         return handleResponse(req, res, response);
       })
       .catch(function(e) {
-        return handleError(e, req, res, response, next);
+        return handleError.call(this, e, req, res, response, next);
       })
       .finally(next);
-  };
+  }).bind(this);
 };
 
 /**
@@ -130,28 +124,26 @@ ExpressOAuthServer.prototype.token = function(options) {
  */
 
 ExpressOAuthServer.prototype.revoke = function(options) {
-  var server = this.server;
-
-  return function(req, res, next) {
+  return (function(req, res, next) {
     var request = new Request(req);
     var response = new Response(res);
 
     return Promise.bind(this)
       .then(function() {
-        return server.revoke(request, response, options);
+        return this.server.revoke(request, response, options);
       })
       .then(function() {
         return handleResponse(req, res, response);
       })
       .catch(function(e) {
         if (e instanceof InvalidTokenError) {
-          res.locals.invalidTokenOnRevoke = true;
+          this.invalidTokenOnRevoke = true;
         }
 
-        return handleError(e, req, res, response, next);
+        return handleError.call(this, e, req, res, response, next);
       })
       .finally(next);
-  };
+  }).bind(this);
 };
 
 /**
@@ -176,7 +168,6 @@ var handleResponse = function(req, res, response) {
  */
 
 var handleError = function(e, req, res, response, next) {
-
   if (this.useErrorHandler === true) {
     next(e);
   } else {
@@ -197,7 +188,7 @@ var handleError = function(e, req, res, response, next) {
      * is already achieved.
      * @see https://tools.ietf.org/html/rfc7009#section-2.2
      */
-    if (res.locals.invalidTokenOnRevoke) {
+    if (this.invalidTokenOnRevoke) {
       return res.status(200).send()
     }
 
